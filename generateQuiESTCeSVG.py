@@ -103,6 +103,18 @@ def make_pngdata(path):
                 )
     return path
 
+def textwidth(text, fontsize=16):
+    try:
+        import cairo
+    except Exception:
+        return len(str) * fontsize
+    surface = cairo.SVGSurface('undefined.svg', 1280, 200)
+    cr = cairo.Context(surface)
+    cr.select_font_face('Arial', cairo.FONT_SLANT_NORMAL, cairo.FONT_WEIGHT_BOLD)
+    cr.set_font_size(fontsize)
+    xbearing, ybearing, width, height, xadvance, yadvance = cr.text_extents(text)
+    return width
+
 def generate_svg(dir_path, images, title, background_color, output_file):
     dwg = svgwrite.Drawing(filename=f"{output_file}.svg", size=("27.2cm", "19.15cm"))
     dwg.add(dwg.rect(insert=(0,0), size=("27.2cm", "19.15cm"), fill='white', stroke="black", stroke_width=".5mm"))
@@ -130,8 +142,12 @@ def generate_svg(dir_path, images, title, background_color, output_file):
             clip_path = dwg.defs.add(dwg.clipPath(id=f'clip_path_h{i}')) #name the clip path
             clip_path.add(dwg.rect((f'{x+(stroke_w)/2}cm', f'{y+(stroke_w)/2}cm'),(f'{w-stroke_w}cm', f'{h-stroke_w}cm'))) #things inside this shape will be drawn
             g.add(dwg.rect(insert=(f'{x}cm', f'{y+h-0.45}cm'), size=(f'{w}cm', "1cm"), fill='white', stroke=background_color, stroke_width=".3mm", rx=13, clip_path=f"url(#clip_path_h{i})"))
-            
-            g.add(dwg.text(text, insert=(f'{x+w/2}cm', f'{y+h-1.5*stroke_w}cm'), font_size=".35cm", text_anchor="middle"))
+            t_font_size=.37
+            while textwidth(text,37*t_font_size) > (w-.1)*37:
+                t_font_size -= 0.005
+                # print(text,textwidth(text,37*t_font_size))
+            txt=dwg.text(text, insert=(f'{x+w/2}cm', f'{y+h-1.5*stroke_w}cm'), font_size=f"{t_font_size}cm", text_anchor="middle")
+            g.add(txt)
             group_b.add(g)
             
     # Groupe B (haut) : 3 lignes de 8 
@@ -151,7 +167,12 @@ def generate_svg(dir_path, images, title, background_color, output_file):
             clip_path.add(dwg.rect((f'{x+(stroke_w)/2}cm', f'{y+(stroke_w)/2}cm'),(f'{w-stroke_w}cm', f'{h-stroke_w}cm'))) #things inside this shape will be drawn
             g.add(dwg.rect(insert=(f'{x+.15}cm', f'{y+h-0.45}cm'), size=(f'{w-.3}cm', "1cm"), fill='white', stroke=background_color, stroke_width=".3mm", rx=13, clip_path=f"url(#clip_path_b{i})"))
 
-            g.add(dwg.text(text, insert=(f'{x+w/2}cm', f'{y+h-1.5*stroke_w}cm'), font_size=".4cm", text_anchor="middle"))
+            t_font_size=.40
+            while textwidth(text,37*t_font_size) > (w-.3-.1)*37:
+                t_font_size -= 0.005
+                # print(text,textwidth(text,37*t_font_size))
+            txt=dwg.text(text, insert=(f'{x+w/2}cm', f'{y+h-1.5*stroke_w}cm'), font_size=f"{t_font_size}cm", text_anchor="middle")
+            g.add(txt)
             group_b.add(g)
 
     t.add(group_a)
