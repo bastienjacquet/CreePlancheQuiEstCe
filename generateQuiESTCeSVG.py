@@ -2,7 +2,7 @@ import os
 import argparse, random
 import svgwrite
 from PIL import Image, ImageEnhance, ImageStat, ImageDraw
-from svglib.svglib import svg2rlg
+#from svglib.svglib import svg2rlg
 from reportlab.graphics import renderPDF
 
 def completeImagesTo24(images):
@@ -37,31 +37,76 @@ def generate_svgs(dir_path, title, background_colors, output_file):
         generate_svg(dir_path, images, title, color, filename)
         random.shuffle(images) # Mélange de l'ordre pour éviter la triche
 
-        with open(f"{filename}.svg", "rb") as f:
-            drawing = svg2rlg(f)
-        renderPDF.drawToFile(drawing, f"{filename}.pdf")
+        # with open(f"{filename}.svg", "rb") as f:
+        #     drawing = svg2rlg(f)
+        # renderPDF.drawToFile(drawing, f"{filename}.pdf")
         import cairosvg
         cairosvg.svg2pdf(url=f"{filename}.svg", write_to=f"{filename}.pdf")
 
+def get_type(path, header):
+    """Basic magic header checker, returns mime type"""
+    for head, mime in (
+        (b"\x89PNG", "image/png"),
+        (b"\xff\xd8", "image/jpeg"),
+        (b"BM", "image/bmp"),
+        (b"GIF87a", "image/gif"),
+        (b"GIF89a", "image/gif"),
+        (b"MM\x00\x2a", "image/tiff"),
+        (b"II\x2a\x00", "image/tiff"),
+    ):
+        if header.startswith(head):
+            return mime
+
+    # ico files lack any magic... therefore we check the filename instead
+    for ext, mime in (
+        # official IANA registered MIME is 'image/vnd.microsoft.icon' tho
+        (".ico", "image/x-icon"),
+        (".svg", "image/svg+xml"),
+    ):
+        if path.endswith(ext):
+            return mime
+    return None
 
 def make_pngdata(path):
-    import svgwrite
     import base64
-    from wand.image import Image
+    try:
+        from wand.image import Image
+        # Load PNG Image using wand
+        img = Image(filename=path)
+        # # Then get raw PNG data and encode DIRECTLY into the SVG file.
+        image_data,file_type = img.make_blob(format='png'),'image/png'
+        encoded = base64.b64encode(image_data).decode()
 
-    # Load PNG Image
-    dwg = svgwrite.Drawing()
-    img = Image(filename=path)
+        imgdata = 'data:{};base64,{}'.format(file_type,encoded)
+        return imgdata
 
-    # Then get raw PNG data and encode DIRECTLY into the SVG file.
-    image_data = img.make_blob(format='png')
-    encoded = base64.b64encode(image_data).decode()
-    pngdata = 'data:image/png;base64,{}'.format(encoded)
-    return pngdata
+    except ImportError:
+        if not os.path.isfile(path+'f'):
+            print(('File not found "{}". Unable to embed image.').format(path))
+            return path
+
+        with open(path, "rb") as handle:
+            # Don't read the whole file to check the header
+            file_type = get_type(path, handle.read(10))
+            handle.seek(0)
+
+            if file_type:
+                # Future: Change encodestring to encodebytes when python3 only
+                return "data:{};base64,{}".format(
+                        file_type, base64.encodebytes(handle.read()).decode("ascii")
+                    )
+            else:
+                print((
+                        "%s is not of type image/png, image/jpeg, "
+                        "image/bmp, image/gif, image/tiff, or image/x-icon"
+                    ) % path
+                )
+    return path
 
 def generate_svg(dir_path, images, title, background_color, output_file):
     dwg = svgwrite.Drawing(filename=f"{output_file}.svg", size=("27.2cm", "19.15cm"))
     dwg.add(dwg.rect(insert=(0,0), size=("27.2cm", "19.15cm"), fill='white', stroke="black", stroke_width=".5mm"))
+    # dwg.add(dwg.rect(insert=(-(29.7-27.2)/2,-(21-19.15)/2), size=("29.7cm", "21cm"), fill='none', stroke="black", stroke_width=".1mm"))
     # t = dwg.g(style="font-size:30;font-family:Comic Sans MS, Arial;font-weight:bold;font-style:oblique;stroke:black;stroke-width:1;fill:none")
     t = dwg.g(style="font-size:30;font-family: Arial")
 
